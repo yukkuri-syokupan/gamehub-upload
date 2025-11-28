@@ -1,0 +1,706 @@
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>アメ・ユニバース - 究極のアメクリッカー</title>
+    <style>
+        :root {
+            --primary: #ff6b6b;
+            --secondary: #4ecdc4;
+            --dark: #2c3e50;
+            --light: #f7f9fc;
+            --gold: #ffd700;
+        }
+
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background-color: var(--dark);
+            color: var(--light);
+            margin: 0;
+            overflow: hidden;
+            display: flex;
+            height: 100vh;
+            user-select: none;
+        }
+
+        /* 左パネル：クリッカーエリア */
+        #click-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(circle at center, #3d566e 0%, var(--dark) 100%);
+            position: relative;
+        }
+
+        #candy-count-display {
+            font-size: 3rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+            text-align: center;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        
+        #cps-display {
+            font-size: 1.2rem;
+            color: #ccc;
+            margin-bottom: 2rem;
+        }
+
+        #big-candy {
+            width: 250px;
+            height: 250px;
+            background: radial-gradient(circle at 30% 30%, #ff9999, #ff0000);
+            border-radius: 50%;
+            box-shadow: 0 0 50px rgba(255, 0, 0, 0.2);
+            cursor: pointer;
+            transition: transform 0.05s;
+            position: relative;
+            z-index: 10;
+        }
+
+        #big-candy:active {
+            transform: scale(0.95);
+        }
+
+        #big-candy::after {
+            content: '';
+            position: absolute;
+            top: 20%;
+            left: 20%;
+            width: 60px;
+            height: 40px;
+            background: rgba(255, 255, 255, 0.4);
+            border-radius: 50%;
+            transform: rotate(-45deg);
+        }
+
+        /* 右パネル：ショップエリア */
+        #shop-area {
+            width: 400px;
+            background-color: rgba(0, 0, 0, 0.3);
+            border-left: 1px solid #444;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+
+        .tab-header {
+            display: flex;
+            background-color: #222;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 15px;
+            background: none;
+            border: none;
+            color: #888;
+            cursor: pointer;
+            font-weight: bold;
+            border-bottom: 3px solid transparent;
+            transition: 0.3s;
+        }
+
+        .tab-btn.active {
+            color: var(--light);
+            border-bottom-color: var(--primary);
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+
+        .item-list {
+            padding: 10px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .building-item, .upgrade-item {
+            background-color: rgba(255, 255, 255, 0.05);
+            margin-bottom: 8px;
+            padding: 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid transparent;
+        }
+
+        .building-item:hover, .upgrade-item:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+            border-color: #666;
+        }
+
+        .building-item.disabled, .upgrade-item.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            filter: grayscale(100%);
+        }
+
+        .item-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .item-name { font-weight: bold; font-size: 1.1rem; }
+        .item-cost { color: var(--secondary); font-size: 0.9rem; }
+        .item-count { font-size: 1.5rem; font-weight: bold; color: #666; }
+        .item-desc { font-size: 0.8rem; color: #aaa; margin-top: 4px; }
+
+        /* パーティクル */
+        .click-number {
+            position: absolute;
+            color: var(--light);
+            font-weight: bold;
+            font-size: 1.5rem;
+            pointer-events: none;
+            animation: floatUp 1s ease-out forwards;
+            text-shadow: 1px 1px 2px black;
+        }
+
+        @keyframes floatUp {
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            100% { transform: translateY(-100px) scale(1.5); opacity: 0; }
+        }
+
+        /* ゴールデンキャンディ */
+        #golden-candy {
+            position: absolute;
+            width: 80px;
+            height: 80px;
+            background: radial-gradient(circle at 30% 30%, #fff7cc, #ffd700);
+            border-radius: 50%;
+            box-shadow: 0 0 20px var(--gold);
+            cursor: pointer;
+            z-index: 100;
+            display: none;
+            animation: pulse 1s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        .notification {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            padding: 10px 20px;
+            border-radius: 20px;
+            border: 1px solid var(--secondary);
+            opacity: 0;
+            transition: opacity 0.5s;
+            pointer-events: none;
+            z-index: 2000;
+        }
+        
+        /* 転生ボタン */
+        .prestige-btn {
+            background: linear-gradient(45deg, #ffd700, #ffa500);
+            border: none;
+            padding: 15px 40px;
+            font-size: 1.5rem;
+            color: black;
+            font-weight: bold;
+            border-radius: 50px;
+            cursor: pointer;
+            margin-top: 20px;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+            transition: 0.2s;
+        }
+        .prestige-btn:disabled {
+            background: #555;
+            box-shadow: none;
+            cursor: not-allowed;
+        }
+
+    </style>
+</head>
+<body>
+
+<div id="click-area">
+    <div id="candy-count-display">0 アメ</div>
+    <div id="cps-display">秒間生産量: 0</div>
+    <div id="big-candy"></div>
+    <div id="golden-candy"></div>
+</div>
+
+<div id="shop-area">
+    <div class="tab-header">
+        <button class="tab-btn active" onclick="switchTab('buildings')">施設</button>
+        <button class="tab-btn" onclick="switchTab('upgrades')">強化</button>
+        <button class="tab-btn" onclick="switchTab('settings')">システム</button>
+    </div>
+
+    <div id="buildings-tab" class="item-list"></div>
+    <div id="upgrades-tab" class="item-list" style="display:none;"></div>
+    
+    <div id="settings-tab" class="item-list" style="display:none; text-align: center; padding: 20px;">
+        <h3>データ管理</h3>
+        <button onclick="saveGame()" style="padding:10px; width:100%; margin-bottom:10px; cursor:pointer;">手動セーブ</button>
+        <div style="font-size:0.8rem; color:#aaa; margin-bottom:20px;">※60秒ごとに自動セーブされます</div>
+        <button onclick="hardReset()" style="padding:10px; width:100%; background:#ff4444; color:white; border:none; cursor:pointer;">データ完全消去</button>
+        
+        <hr style="border-color:#555; margin: 20px 0;">
+        
+        <h3 style="color: var(--gold);">アメの昇華 (Prestige)</h3>
+        <p>全アメを捧げて「角砂糖」を得る。</p>
+        <p>獲得予定: <span id="pending-sugar" style="font-weight:bold; color:var(--gold); font-size:1.2rem;">0</span> 個</p>
+        <p style="font-size:0.8rem;">(角砂糖1個 = 生産力 +10%)</p>
+        <button onclick="prestige()" class="prestige-btn" id="prestige-btn" disabled>昇華する</button>
+        <p style="margin-top:10px;">所持数: <span id="current-sugar">0</span> 個</p>
+    </div>
+</div>
+
+<div id="notification" class="notification">Game Saved</div>
+
+<script>
+    /* --- グローバル変数（デベロッパーツールからアクセス可能にします） --- */
+    window.game = {
+        candies: 0,
+        totalCandies: 0,
+        startTime: Date.now(),
+        buildings: [],
+        upgrades: [],
+        sugarCubes: 0,
+        prestigeCount: 0
+    };
+
+    const UNITS = ["", "万", "億", "兆", "京", "垓", "𥝱", "穣", "溝", "澗", "正", "載", "極", "恒河沙", "阿僧祇", "那由他", "不可思議", "無量大数"];
+    
+    // 施設定義
+    const buildingDefs = [
+        { id: 'cursor', name: '自動クリック', baseCost: 15, baseCps: 0.1, desc: '10秒に1回クリック。' },
+        { id: 'grandma', name: 'おばあちゃん', baseCost: 100, baseCps: 1, desc: '優しい手作りアメ。' },
+        { id: 'farm', name: 'アメ農園', baseCost: 1100, baseCps: 8, desc: '畑からアメを収穫。' },
+        { id: 'factory', name: 'アメ工場', baseCost: 12000, baseCps: 47, desc: 'ベルトコンベアで大量生産。' },
+        { id: 'mine', name: 'アメ鉱山', baseCost: 130000, baseCps: 260, desc: '地下深くのアメ鉱脈。' },
+        { id: 'lab', name: '錬金術ラボ', baseCost: 1400000, baseCps: 1400, desc: '科学の力でアメを生成。' },
+        { id: 'portal', name: 'アメポータル', baseCost: 20000000, baseCps: 7800, desc: '異次元からの輸送。' },
+        { id: 'time', name: 'タイムマシン', baseCost: 330000000, baseCps: 44000, desc: '未来のアメを前借り。' },
+        { id: 'prism', name: 'プリズム', baseCost: 5100000000, baseCps: 260000, desc: '光を物質化。' },
+        { id: 'universe', name: 'アメ銀河', baseCost: 75000000000, baseCps: 1600000, desc: '惑星自体がアメで出来ている。' },
+        { id: 'god', name: '創造神', baseCost: 1000000000000, baseCps: 10000000, desc: '「アメあれ」' }
+    ];
+
+    // アップグレード定義
+    const upgradeDefs = [
+        { id: 'click1', name: '強化指', cost: 500, type: 'click', mult: 2, desc: 'クリック2倍', trigger: 100 },
+        { id: 'click2', name: 'ダイヤ指', cost: 50000, type: 'click', mult: 2, desc: 'クリックさらに2倍', trigger: 10000 },
+        { id: 'g_boost1', name: '老眼鏡', cost: 1000, type: 'building', buildingId: 'grandma', mult: 2, desc: 'おばあちゃん2倍', trigger: 10 },
+        { id: 'f_boost1', name: '化学肥料', cost: 11000, type: 'building', buildingId: 'farm', mult: 2, desc: '農園2倍', trigger: 10 },
+        { id: 'fact_boost1', name: 'ロボット化', cost: 120000, type: 'building', buildingId: 'factory', mult: 2, desc: '工場2倍', trigger: 10 },
+        { id: 'mine_boost1', name: '超硬ドリル', cost: 1300000, type: 'building', buildingId: 'mine', mult: 2, desc: '鉱山2倍', trigger: 10 },
+        { id: 'all_boost', name: '砂糖の奇跡', cost: 1000000000, type: 'global', mult: 1.1, desc: '全生産量+10%', trigger: 1000000 }
+    ];
+
+    /* --- 初期化 --- */
+    function init() {
+        loadGame(); // ローカルストレージから読み込み
+        
+        // データ補正（バージョンアップ対策）
+        if (game.buildings.length !== buildingDefs.length) {
+            buildingDefs.forEach((def, index) => {
+                if (!game.buildings[index]) game.buildings[index] = { count: 0 };
+            });
+        }
+        
+        createUI();
+        requestAnimationFrame(gameLoop);
+        
+        // オートセーブ（60秒ごと）
+        setInterval(saveGame, 60000);
+        
+        // ゴールデンキャンディ抽選
+        setInterval(trySpawnGoldenCandy, 1000);
+
+        // チート説明をコンソールに出力
+        printCheatCodes();
+    }
+
+    /* --- セーブ/ロード機能 --- */
+    function saveGame() {
+        try {
+            localStorage.setItem('CandyUniverseSave', JSON.stringify(window.game));
+            showNotification("Game Saved");
+        } catch (e) {
+            console.error("Save failed:", e);
+        }
+    }
+
+    function loadGame() {
+        const save = localStorage.getItem('CandyUniverseSave');
+        if (save) {
+            try {
+                const savedGame = JSON.parse(save);
+                window.game = { ...window.game, ...savedGame };
+            } catch (e) {
+                console.error("Save file corrupted, starting new game.");
+            }
+        }
+    }
+
+    /* --- ゲームロジック --- */
+    function getBuildingCost(index) {
+        const base = buildingDefs[index].baseCost;
+        const count = game.buildings[index].count;
+        return Math.floor(base * Math.pow(1.15, count));
+    }
+
+    function getCps() {
+        let cps = 0;
+        buildingDefs.forEach((def, index) => {
+            let mult = 1;
+            upgradeDefs.forEach(u => {
+                if (game.upgrades.includes(u.id) && u.type === 'building' && u.buildingId === def.id) mult *= u.mult;
+                if (game.upgrades.includes(u.id) && u.type === 'global') mult *= u.mult;
+            });
+            cps += (def.baseCps * game.buildings[index].count * mult);
+        });
+        
+        // 転生ボーナス
+        const prestigeMult = 1 + (game.sugarCubes * 0.1);
+        return cps * prestigeMult * (feverMode ? 7 : 1);
+    }
+
+    function getClickPower() {
+        let power = 1;
+        const totalBuildings = game.buildings.reduce((a, b) => a + b.count, 0);
+        power += totalBuildings * 0.5; // 施設数でクリック強化
+        
+        upgradeDefs.forEach(u => {
+            if (game.upgrades.includes(u.id) && u.type === 'click') power *= u.mult;
+            if (game.upgrades.includes(u.id) && u.type === 'global') power *= u.mult;
+        });
+
+        const prestigeMult = 1 + (game.sugarCubes * 0.1);
+        return power * prestigeMult * (feverMode ? 77 : 1);
+    }
+
+    /* --- メインループ --- */
+    let lastTime = Date.now();
+    let feverMode = false;
+    let feverTimer = 0;
+
+    function gameLoop() {
+        const now = Date.now();
+        const dt = (now - lastTime) / 1000;
+        lastTime = now;
+
+        const cps = getCps();
+        if (cps > 0) {
+            game.candies += cps * dt;
+            game.totalCandies += cps * dt;
+            checkUnlocks();
+        }
+
+        if (feverMode) {
+            feverTimer -= dt;
+            if (feverTimer <= 0) {
+                feverMode = false;
+                document.body.style.boxShadow = "none";
+            }
+        }
+
+        updateDisplay(cps);
+        updateButtons();
+        requestAnimationFrame(gameLoop);
+    }
+
+    /* --- UI更新 --- */
+    function createUI() {
+        const bTab = document.getElementById('buildings-tab');
+        bTab.innerHTML = '';
+        buildingDefs.forEach((def, index) => {
+            const div = document.createElement('div');
+            div.className = 'building-item';
+            div.id = `b-item-${index}`;
+            div.onclick = () => buyBuilding(index);
+            div.innerHTML = `
+                <div class="item-info">
+                    <span class="item-name">${def.name}</span>
+                    <span class="item-cost" id="b-cost-${index}">Cost: ${formatNumber(getBuildingCost(index))}</span>
+                    <span class="item-desc">${def.desc}</span>
+                </div>
+                <span class="item-count" id="b-count-${index}">${game.buildings[index].count}</span>
+            `;
+            bTab.appendChild(div);
+        });
+        updateUpgradesUI();
+    }
+
+    function updateDisplay(cps = getCps()) {
+        document.getElementById('candy-count-display').innerText = `${formatNumber(game.candies)} アメ`;
+        document.getElementById('cps-display').innerText = `秒間: ${formatNumber(cps)}`;
+        document.title = `${formatNumber(game.candies)} アメ - Candy Universe`;
+
+        // 転生関連
+        const pending = calculatePrestige();
+        document.getElementById('pending-sugar').innerText = formatNumber(pending);
+        document.getElementById('current-sugar').innerText = formatNumber(game.sugarCubes);
+        
+        const prestigeBtn = document.getElementById('prestige-btn');
+        prestigeBtn.disabled = pending <= 0;
+    }
+
+    function updateUpgradesUI() {
+        const uTab = document.getElementById('upgrades-tab');
+        uTab.innerHTML = '';
+        let hasItems = false;
+        upgradeDefs.forEach((def, index) => {
+            if (game.upgrades.includes(def.id)) return;
+            if (game.totalCandies < def.trigger) return;
+
+            hasItems = true;
+            const div = document.createElement('div');
+            div.className = 'upgrade-item';
+            div.id = `u-item-${index}`;
+            div.onclick = () => buyUpgrade(index);
+            div.innerHTML = `
+                <div class="item-info">
+                    <span class="item-name">${def.name}</span>
+                    <span class="item-cost">Cost: ${formatNumber(def.cost)}</span>
+                    <span class="item-desc">${def.desc}</span>
+                </div>
+            `;
+            uTab.appendChild(div);
+        });
+        if (!hasItems) uTab.innerHTML = '<div style="padding:20px; text-align:center; color:#888;">現在購入可能な強化はありません</div>';
+    }
+
+    function updateButtons() {
+        buildingDefs.forEach((_, index) => {
+            const btn = document.getElementById(`b-item-${index}`);
+            const cost = getBuildingCost(index);
+            if (game.candies < cost) btn.classList.add('disabled');
+            else btn.classList.remove('disabled');
+        });
+        
+        const upItems = document.querySelectorAll('.upgrade-item');
+        upItems.forEach(item => {
+            const index = item.id.split('-')[2];
+            if(index !== undefined) {
+                 const cost = upgradeDefs[index].cost;
+                 if(game.candies < cost) item.classList.add('disabled');
+                 else item.classList.remove('disabled');
+            }
+        });
+    }
+
+    /* --- 操作系 --- */
+    document.getElementById('big-candy').addEventListener('mousedown', (e) => {
+        const amount = getClickPower();
+        game.candies += amount;
+        game.totalCandies += amount;
+        spawnFloatingText(e.clientX, e.clientY, `+${formatNumber(amount)}`);
+        playClickSound();
+        checkUnlocks();
+    });
+
+    function buyBuilding(index) {
+        const cost = getBuildingCost(index);
+        if (game.candies >= cost) {
+            game.candies -= cost;
+            game.buildings[index].count++;
+            document.getElementById(`b-cost-${index}`).innerText = `Cost: ${formatNumber(getBuildingCost(index))}`;
+            document.getElementById(`b-count-${index}`).innerText = game.buildings[index].count;
+            updateDisplay();
+        }
+    }
+
+    function buyUpgrade(index) {
+        const def = upgradeDefs[index];
+        if (game.candies >= def.cost) {
+            game.candies -= def.cost;
+            game.upgrades.push(def.id);
+            updateUpgradesUI();
+            updateDisplay();
+        }
+    }
+
+    function switchTab(tabName) {
+        document.querySelectorAll('.item-list').forEach(el => el.style.display = 'none');
+        document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+        document.getElementById(`${tabName}-tab`).style.display = 'block';
+        
+        const btns = document.querySelectorAll('.tab-btn');
+        if(tabName==='buildings') btns[0].classList.add('active');
+        if(tabName==='upgrades') btns[1].classList.add('active');
+        if(tabName==='settings') btns[2].classList.add('active');
+        
+        if(tabName==='upgrades') updateUpgradesUI();
+    }
+
+    /* --- イベント & 転生 --- */
+    function checkUnlocks() {
+        if (Math.random() < 0.1) updateUpgradesUI();
+    }
+
+    function trySpawnGoldenCandy() {
+        if (feverMode || document.getElementById('golden-candy').style.display === 'block') return;
+        if (Math.random() < 0.005) { // 0.5% chance per second
+            const golden = document.getElementById('golden-candy');
+            golden.style.left = Math.random() * (window.innerWidth - 100) + 'px';
+            golden.style.top = Math.random() * (window.innerHeight - 100) + 'px';
+            golden.style.display = 'block';
+            setTimeout(() => golden.style.display = 'none', 10000);
+        }
+    }
+
+    document.getElementById('golden-candy').onclick = function() {
+        this.style.display = 'none';
+        feverMode = true;
+        feverTimer = 15;
+        document.body.style.boxShadow = "inset 0 0 100px var(--gold)";
+        showNotification("FEVER! x7倍");
+        game.candies += getCps() * 600;
+    };
+
+    function calculatePrestige() {
+        if (game.totalCandies < 1000000) return 0;
+        const potential = Math.floor(Math.cbrt(game.totalCandies / 1000000));
+        return Math.max(0, potential - game.sugarCubes);
+    }
+
+    function prestige() {
+        const gain = calculatePrestige();
+        if (gain <= 0) return;
+        if (!confirm(`転生しますか？\n角砂糖 +${gain}`)) return;
+
+        game.sugarCubes += gain;
+        game.candies = 0;
+        game.buildings.forEach(b => b.count = 0);
+        game.upgrades = [];
+        saveGame();
+        location.reload();
+    }
+
+    function hardReset() {
+        if (confirm("全データを消去しますか？")) {
+            localStorage.removeItem('CandyUniverseSave');
+            location.reload();
+        }
+    }
+
+    /* --- ユーティリティ --- */
+    function formatNumber(num) {
+        if (num < 10000) return Math.floor(num).toLocaleString();
+        let unitIndex = 0;
+        let n = Math.floor(num);
+        while (n >= 10000 && unitIndex < UNITS.length - 1) {
+            n /= 10000;
+            unitIndex++;
+        }
+        return n.toFixed(2) + UNITS[unitIndex];
+    }
+
+    function showNotification(msg) {
+        const el = document.getElementById('notification');
+        el.innerText = msg;
+        el.style.opacity = 1;
+        setTimeout(() => el.style.opacity = 0, 2000);
+    }
+
+    function spawnFloatingText(x, y, text) {
+        const el = document.createElement('div');
+        el.className = 'click-number';
+        el.innerText = text;
+        el.style.left = `${x}px`;
+        el.style.top = `${y}px`;
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), 1000);
+    }
+
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playClickSound() {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(800 + Math.random() * 200, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.15);
+    }
+
+    /* =========================================
+       チート機能 (Developer Tools API)
+       ========================================= */
+    
+    // チートコマンドをまとめたオブジェクト
+    window.Cheat = {
+        // アメを大量に追加
+        addCandies: function(amount) {
+            window.game.candies += amount;
+            window.game.totalCandies += amount;
+            updateDisplay();
+            console.log(`🍭 ${formatNumber(amount)} アメを追加しました。現在: ${formatNumber(window.game.candies)}`);
+        },
+        
+        // 角砂糖（転生通貨）を追加
+        addSugar: function(amount) {
+            window.game.sugarCubes += amount;
+            updateDisplay();
+            console.log(`🧊 角砂糖 ${amount} 個を追加しました。生産倍率が上がりました！`);
+        },
+        
+        // ゴールデンキャンディを強制出現
+        spawnGolden: function() {
+            const golden = document.getElementById('golden-candy');
+            golden.style.left = '50%';
+            golden.style.top = '50%';
+            golden.style.display = 'block';
+            console.log(`✨ ゴールデンキャンディを出現させました。`);
+        },
+
+        // フィーバーモード発動
+        fever: function() {
+            feverMode = true;
+            feverTimer = 60; // 60秒
+            document.body.style.boxShadow = "inset 0 0 100px var(--gold)";
+            console.log(`🔥 フィーバーモード発動！(60秒間)`);
+        },
+
+        // 施設を全部100個ずつ買う
+        richMan: function() {
+            window.game.buildings.forEach(b => b.count += 100);
+            updateDisplay();
+            createUI(); // 表示更新
+            console.log(`🏭 全施設を100個ずつ追加しました。`);
+        }
+    };
+
+    // コンソールへの案内表示
+    function printCheatCodes() {
+        const styleTitle = "color: #ff6b6b; font-size: 20px; font-weight: bold; text-shadow: 1px 1px black;";
+        const styleCode = "color: #4ecdc4; font-weight: bold; background: #222; padding: 2px 5px; border-radius: 3px;";
+        const styleDesc = "color: #ccc;";
+
+        console.log("%c🍬 Candy Universe Developer Console 🍬", styleTitle);
+        console.log("%c以下のコマンドを入力して実行できます:", "color: #fff; margin-bottom: 10px;");
+        
+        console.log(`%cCheat.addCandies(100000000)%c - アメを1億個追加`, styleCode, styleDesc);
+        console.log(`%cCheat.addSugar(1000)%c - 角砂糖を1000個追加（攻撃力激増）`, styleCode, styleDesc);
+        console.log(`%cCheat.spawnGolden()%c - ゴールデンキャンディを召喚`, styleCode, styleDesc);
+        console.log(`%cCheat.fever()%c - 60秒間フィーバーモード`, styleCode, styleDesc);
+        console.log(`%cCheat.richMan()%c - 全施設+100個`, styleCode, styleDesc);
+        console.log("%c-----------------------------------", "color: #555;");
+    }
+
+    init();
+
+</script>
+</body>
+</html>
